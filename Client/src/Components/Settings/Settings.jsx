@@ -2,7 +2,7 @@
 import React, { useState } from 'react'
 import { useRoom } from '../../Context/roomContext'
 import { socket } from '../../socket'
-import SettingsForm from './SettingsForm'
+import SettingsForm from '../Settings/SettingsForm.jsx'
 
 function Settings() {
     const { room } = useRoom()

@@ -7,10 +7,10 @@ import { ChatProvider } from './Context/chatContext.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <ChatProvider>
-      <RoomProvider >
+    <RoomProvider >
+      <ChatProvider>
         <App />
-      </RoomProvider>
-    </ChatProvider>
+      </ChatProvider>
+    </RoomProvider>
   </StrictMode>,
 )

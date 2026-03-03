@@ -8,6 +8,7 @@ import { socket } from '../socket.js'
 function ChoseChosing() {
     const { currPlayer, words, setWord, room, chosen } = useRoom()
     const roomState = room?.gameState?.roomState
+    let timer
     // const [timeLeft, setTimeLeft] = useState(10)
     if (roomState !== 'in-progress') return null
 
@@ -18,11 +19,17 @@ function ChoseChosing() {
     useEffect(() => {
         if (!isMyTurn || words.length === 0) return
 
-        const timer = setTimeout(() => {
+        timer = setTimeout(() => {
             setWord(words[0])  // Auto-pick first word
+            console.log('Auto picking despite already picked');
+            
         }, 10000)
 
-        return () => clearTimeout(timer)
+        return () => {
+            clearTimeout(timer)
+            console.log('cleared? yes');
+            
+        }
     }, [isMyTurn, words])
 
     console.log(chosen);
@@ -40,7 +47,7 @@ function ChoseChosing() {
                             <button
                                 key={index}
                                 onClick={() => {
-                                    setWord(word)
+                                    setWord(word, timer)
                                 }}
                                 className='bg-violet-600 hover:bg-violet-500 text-white font-semibold py-4 px-6 rounded-lg text-lg transition-colors'
                             >

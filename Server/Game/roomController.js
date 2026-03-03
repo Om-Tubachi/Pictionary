@@ -181,7 +181,7 @@ export const startGame = socketHandler(
 
 export const nextTurn = async (roomId, socket, io) => {
     await clearTimers(roomId)
-    
+
     const t = new Date()
     console.log('timer has been set at in next Turn' + t.toLocaleTimeString());
 
@@ -191,7 +191,7 @@ export const nextTurn = async (roomId, socket, io) => {
     const currPlayer = room?.players?.find(({ id }) => id === currId)
 
     room.gameState.guessedWords = []
-    // room.gameState.word = ''
+    room.gameState.word = ''
     room.gameState.drawingData = []
     if (!currPlayer) {
         console.log('failed to assign a turn');
@@ -337,7 +337,7 @@ export const handleTexts = socketHandler(
 
         console.log(data);
 
-        const { message, time } = data
+        const { message } = data
         if (!message) {
             socket.emit(ServerEvent.ERROR, {
                 message: `Failed to recieve message on server`
@@ -357,7 +357,7 @@ export const handleTexts = socketHandler(
         const player = room?.players?.find(({ id }) => id === socket?.id)
 
         if (guess.toLowerCase() === currWord.toLowerCase()) {
-            return await handleGuess(roomId, socket, io, player, time)
+            return await handleGuess(roomId, socket, io, player, Date.now())
         }
         io.to(roomId).emit(ServerEvent.INCORRECT_GUESS, {
             from: player,
@@ -385,6 +385,7 @@ export const awardPoints = socketHandler(
         // store all guesses structured as: { playerId: , timeGuessedAt: , points: }
         // formula: points = lastPoints - ((((timeGuessesAt - timeStartedAt)*5*20)/turnTime ) + (numOfGuesses*5))
         const room = await getRedisRoom(roomId)
+        console.log(timeGuessedAt);
 
         if (!room) {
             socket.emit(ServerEvent.ERROR, {
@@ -393,10 +394,15 @@ export const awardPoints = socketHandler(
             return
         }
         const players = room.players
+
         const guesses = room?.gameState?.guessedWords, lastPoints = guesses.length === 0 ? MAX_POINTS : guesses[guesses.length - 1].points
+
         const timeTurnStarted = room?.gameState?.timerStartedAt, numOfGuesses = guesses.length
-        const constantDeduction = timeTurnStarted / 5, guessDeduction = numOfGuesses * 5;
-        const points = lastPoints - ((((timeGuessedAt - timeTurnStarted) / constantDeduction) * 20) + numOfGuesses * 5)
+        const constantDeduction = timeTurnStarted / 7, guessDeduction = numOfGuesses * 5;
+        let points = lastPoints - ((((timeGuessedAt - timeTurnStarted) / constantDeduction) * 20) + numOfGuesses * 5)
+        points = Math.ceil(points)
+        
+
         const newGuess = {
             playerId: player?.id || "",
             points,
@@ -404,6 +410,7 @@ export const awardPoints = socketHandler(
         }
         guesses.push(newGuess)
         room.gameState.guessedWords = guesses
+
         for (let pl of players) {
             if (pl?.id === player?.id) {
                 pl.points += points
@@ -411,8 +418,9 @@ export const awardPoints = socketHandler(
             }
         }
         room.players = players
+        
         await setRedisRoom(roomId, room)
-
+        
         io.to(roomId).emit(
             ServerEvent.CORRECT_GUESS,
             {
@@ -422,8 +430,10 @@ export const awardPoints = socketHandler(
                 response: `${player} guessed CORRECT`,
             }
         )
-
+        const drawerIndex = (room.gameState.currentPlayer - 1 + room.players.length) % room.players.length
+        const currPlayer = room.players[drawerIndex]
         const nonDrawers = room.players.filter(p => p.id !== currPlayer.id)
+        
         const allGuessed = guesses.length === nonDrawers.length
 
         if (allGuessed) {
@@ -448,8 +458,9 @@ export const pointsToCurrPlayer = socketHandler(
             return
         }
 
-        const guesses = room?.gameState?.guessedWords, numOfPlayersGuessed = guesses.length, totalDelta = 0, timeTurnStarted = room?.gameState?.timerStartedAt
+        const guesses = room?.gameState?.guessedWords, numOfPlayersGuessed = guesses.length, timeTurnStarted = room?.gameState?.timerStartedAt
         const players = room?.players
+        let totalDelta = 0
 
         for (let i = 0; i < numOfPlayersGuessed; i++) {
             const guess = guesses[i]
@@ -461,18 +472,18 @@ export const pointsToCurrPlayer = socketHandler(
             }
         }
 
-        const points = numOfPlayersGuessed * 10 - totalDelta / 2;       // 10+ for every correct
-        for (let player in players) {
+        const points = numOfPlayersGuessed * 10 - ((totalDelta / 1000) / 2);       // 10+ for every correct
+        for (let player of players) {
             if (player?.id === currPlayer?.id) {
-                player?.id += points
+                player.points += points
                 break
             }
         }
         room.players = players
         await setRedisRoom(roomId, room)
-        io.to(roomId).emit(ServerEvent.POINTS_AWARDED, {
+        io.to(roomId).emit(ServerEvent.POINTS_TO_CURR, {
             to: currPlayer,
-            incrementedPoints: points,
+            incrementedPoints: points.ceil(points),
             updatedPlayers: players
         })
 
@@ -489,7 +500,8 @@ export const pointsToCurrPlayer = socketHandler(
 
 export const setWord = async (chosenWord, roomId, socket, io) => {
     const room = await getRedisRoom(roomId)
-
+    console.log(`setting word to ${chosenWord} at time ${(new Date()).toLocaleTimeString()}`);
+    
     if (!room) {
         socket.emit(ServerEvent.ERROR, {
             message: `Failed to fetch room for diven room id, ${chosenWord} not set for room id ${roomId}`

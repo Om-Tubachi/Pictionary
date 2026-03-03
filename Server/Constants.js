@@ -22,7 +22,8 @@ export const ServerEvent = {
     REDO: 'redo',
     CLEAR:'clear',
     POINTS_AWARDED:'points-awarded',
-    UPDATE:'update'
+    UPDATE:'update',
+    POINTS_TO_CURR:'points-to-curr'
 }
 
 

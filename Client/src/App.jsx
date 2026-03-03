@@ -2,11 +2,11 @@
 import React from 'react';
 import { useState, useEffect } from 'react'
 import { socket } from './socket';
-import { ConnectionState } from './Components/ConnectionState';
-import { ConnectionManager } from './Components/ConnectionManager';
+import { ConnectionState } from './Components/Conn/ConnectionState';
+import { ConnectionManager } from './Components/Conn/ConnectionManager';
 import { useRoom } from './Context/roomContext';
-import GameRoom from './Components/GameRoom';
-import GameForm from './Components/GameForm';
+import GameRoom from './Components/Game/GameRoom';
+import GameForm from './Components/Game/GameForm';
 
 function App() {
   const [isConnected, setIsConnected] = useState(socket.connected);

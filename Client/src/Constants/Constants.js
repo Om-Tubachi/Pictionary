@@ -16,7 +16,8 @@ export const ServerEvent = {
     WORD_CHOSEN:'word-chosen',
     UNDO:'undo',
     REDO:'redo',
-    CLEAR:'clear'
+    CLEAR:'clear',
+    POINTS_TO_CURR:'points-to-curr'
 }
 
 

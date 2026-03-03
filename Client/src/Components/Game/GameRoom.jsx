@@ -2,7 +2,7 @@
 import React, { useState } from 'react'
 import { useRoom } from '../../Context/roomContext'
 import { socket } from '../../socket'
-import Settings from './Settings'
+import Settings from '../Settings/Settings.jsx'
 import ChoseChosing from '../ChoseChosing'
 import Chat from '../Chat'
 import Canvas from '../Canvas'
@@ -22,7 +22,7 @@ function GameRoom() {
         {room.players.length > 0 ? (
           room.players.map((player) => (
             <div key={player.id} className='bg-slate-700 px-4 py-3 rounded-lg mb-2 flex justify-between items-center'>
-              <span className='font-semibold text-white'>{player.username}</span>
+              <span className='font-semibold text-white'>{player.username} - {player.points}</span>
               {player.id === room.creator && (
                 <span className='text-xs text-violet-400'>Host</span>
               )}

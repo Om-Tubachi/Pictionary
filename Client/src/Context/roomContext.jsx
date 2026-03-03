@@ -101,6 +101,7 @@ export const RoomProvider = ({ children }) => {
 
 
 
+
         return () => {
             socket.off(ServerEvent.JOINED)
             socket.off(ServerEvent.ERROR)
@@ -114,6 +115,7 @@ export const RoomProvider = ({ children }) => {
     }, [])
 
     const handlePlayerJoin = (roomId, player) => {
+        player.points = 0
         socket.emit(ClientEvent.JOIN_GAME, { roomId, player })
     }
 
@@ -138,7 +140,8 @@ export const RoomProvider = ({ children }) => {
         return handlePlayerJoin(roomId, player)
     }
 
-    const setWord = async (chosenWord) => {
+    const setWord = async (chosenWord, timer) => {
+        clearTimeout(timer)
         if (!chosenWord && words.length > 0) chosenWord = words[0]
         socket.emit(ServerEvent.CHOSE_WORD, {
             chosenWord,
@@ -195,9 +198,10 @@ export const RoomProvider = ({ children }) => {
     }
 
     const draw = (data) => {
+        
         const ctx = canvasRef.current?.getContext('2d')
         ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
-
+        
         for (const stroke of data) {
             ctx.beginPath()
             ctx.strokeStyle = stroke.color
@@ -220,6 +224,7 @@ export const RoomProvider = ({ children }) => {
             currPlayer,
             chosen,
             canvasRef,
+            setRoom,
             handlePlayerJoin,
             customRoom,
             handleSettingsChange,
