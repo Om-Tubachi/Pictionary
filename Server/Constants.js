@@ -20,10 +20,11 @@ export const ServerEvent = {
     WORD_CHOSEN: 'word-chosen',
     UNDO: 'undo',
     REDO: 'redo',
-    CLEAR:'clear',
-    POINTS_AWARDED:'points-awarded',
-    UPDATE:'update',
-    POINTS_TO_CURR:'points-to-curr'
+    CLEAR: 'clear',
+    POINTS_AWARDED: 'points-awarded',
+    UPDATE: 'update',
+    POINTS_TO_CURR: 'points-to-curr',
+    NEW_HOST:'new-host'
 }
 
 
@@ -41,12 +42,13 @@ export const ClientEvent = {
     DRAW: 'draw',
     UNDO: 'undo',
     REDO: 'redo',
-    CLEAR:'clear'
+    CLEAR: 'clear'
 }
 
 export const END_REASON = {
     VALID_END: 'valid-end',
     SERVER_FAILURE: 'server-failure',
+    NOT_ENOUGH_PARTICIPANTS:'not-enough-participants'
 }
 
 /**

@@ -1,13 +1,20 @@
 import client from "../Utils/redis.js";
 import { socketHandler } from "../Utils/socketHandler.js";
-import { ClientEvent, RoomState, ServerEvent, END_REASON, MAX_POINTS } from "../Constants.js";
+import {
+    ClientEvent,
+    RoomState,
+    ServerEvent,
+    END_REASON,
+    MAX_POINTS
+} from "../Constants.js";
 import {
     createNewRoom,
     generateRoomId,
     getPublicRoom,
     getRedisRoom,
     setRedisRoom,
-    getRoomFromSocket
+    getRoomFromSocket,
+    deleteRedisRoom
 } from '../Utils/redis.js'
 import { getWords } from "../Words/word.js";
 
@@ -81,8 +88,8 @@ export const handleNewPlayer = socketHandler(
 
 export const handleDisconnect = socketHandler(
     async (socket, io) => {
-        // MANY DIFFERENT CASES WILL COME HERE, WHERE THE PNE WHO DISCONNECTED COUD BE HOST,
-        // CURRENT PLAYER OR A PARTICIPANT
+        // MANY DIFFERENT CASES WILL COME HERE, WHERE THE PNE WHO DISCONNECTED COUD:
+        // HOST, CURRENT PLAYER, PARTICIPANT
 
         let room = await getRoomFromSocket(socket.id)
         if (room === null) {
@@ -96,22 +103,52 @@ export const handleDisconnect = socketHandler(
         const playerLeft = room?.players?.find(({ id }) => id === socket.id)
         room.players = room?.players.filter(({ id }) => id !== socket.id)
 
-        // Host left:
-        if (playerLeft?.id === room.creator) {
-            if (room.players.length > 0) {
-                // Transfer host to first remaining player
-                room.creator = room.players[0].id
-                console.log(`Host left. New host: ${room.players[0].username}`)
-            }
+
+        // current player left:
+        const currPlayer = room?.players[room?.gameState?.currentPlayer]
+        if (!currPlayer) {
+            console.log('Did not find the current player who disconnected');
+            return
         }
 
-        await setRedisRoom(room.roomId, room)
+        if (playerLeft?.id === currPlayer?.id) {
+            io.to(room.roomId).emit(ServerEvent.LEFT, {
+                message: `${currPlayer?.username} was drawing, he suddenly left the room`,
+                playerLeft,
+            })
+        }
 
-        io.to(room.roomId).emit(ServerEvent.LEFT, {
-            message: 'player left',
-            playerLeft,
-            newHost: playerLeft.id === room.creator ? room.players[0] : null
-        })
+        // Host left:
+        if (playerLeft?.id === room.creator) {
+            room.creator = room.players[0].id
+
+            io.to(room.roomId).emit(ServerEvent.NEW_HOST, {
+                message: `New host is: ${room.players[0].username}`,
+                newCreatorId: room.players[0].id
+            })
+        }
+
+        // normal person left:
+        if (playerLeft?.id !== currPlayer?.id && playerLeft?.id !== room?.creator) {
+            io.to(room.roomId).emit(ServerEvent.LEFT, {
+                message: `${currPlayer?.username} was guessing, he left the room`,
+                playerLeft,
+            })
+        }
+
+        await setRedisRoom(room?.roomId, room)
+
+        const res = await validateGame(room?.roomId)
+        if (!res) {
+            return await endGame(room?.roomId, END_REASON.NOT_ENOUGH_PARTICIPANTS, socket, io)
+        }
+
+        if (playerLeft?.id === currPlayer?.id) {
+            room?.gameState?.roomState = RoomState.LOBBY
+            await setRedisRoom(room?.roomId, room)
+            await nextTurn(room?.roomId, socket, io)
+        }
+
     }
 )
 
@@ -226,9 +263,9 @@ export const nextTurn = async (roomId, socket, io) => {
 
     if (room.gameState.currentRound === room.settings.rounds) {
         io.to(roomId).emit(ServerEvent.GAME_END, { message: 'Game ended' })
-        console.log('Ended');
-
-        return
+        room?.gameState?.roomState = RoomState.GAME_END
+        await setRedisRoom(roomId, room)
+        return await endGame(roomId, END_REASON.VALID_END)
     }
 
     console.log('curr is');
@@ -241,7 +278,6 @@ export const nextTurn = async (roomId, socket, io) => {
     return await setTimers(roomId, currPlayer, socket, io)
 }
 
-// needs thinking
 export const handleDraw = socketHandler(
     async (drawingData, currPlayer, roomId, socket, io) => {
         // we will be getting final data from client, 
@@ -355,8 +391,10 @@ export const handleTexts = socketHandler(
 
         const currWord = room?.gameState?.word
         const player = room?.players?.find(({ id }) => id === socket?.id)
+        const currId = room?.players[room?.gameState?.currentPlayer]?.id
+        const currPlayer = room?.players?.find(({ id }) => id === currId)
 
-        if (guess.toLowerCase() === currWord.toLowerCase()) {
+        if (currPlayer?.id !== player?.id && guess.toLowerCase() === currWord.toLowerCase()) {
             return await handleGuess(roomId, socket, io, player, Date.now())
         }
         io.to(roomId).emit(ServerEvent.INCORRECT_GUESS, {
@@ -401,7 +439,7 @@ export const awardPoints = socketHandler(
         const constantDeduction = timeTurnStarted / 7, guessDeduction = numOfGuesses * 5;
         let points = lastPoints - ((((timeGuessedAt - timeTurnStarted) / constantDeduction) * 20) + numOfGuesses * 5)
         points = Math.ceil(points)
-        
+
 
         const newGuess = {
             playerId: player?.id || "",
@@ -418,9 +456,9 @@ export const awardPoints = socketHandler(
             }
         }
         room.players = players
-        
+
         await setRedisRoom(roomId, room)
-        
+
         io.to(roomId).emit(
             ServerEvent.CORRECT_GUESS,
             {
@@ -433,7 +471,7 @@ export const awardPoints = socketHandler(
         const drawerIndex = (room.gameState.currentPlayer - 1 + room.players.length) % room.players.length
         const currPlayer = room.players[drawerIndex]
         const nonDrawers = room.players.filter(p => p.id !== currPlayer.id)
-        
+
         const allGuessed = guesses.length === nonDrawers.length
 
         if (allGuessed) {
@@ -501,7 +539,7 @@ export const pointsToCurrPlayer = socketHandler(
 export const setWord = async (chosenWord, roomId, socket, io) => {
     const room = await getRedisRoom(roomId)
     console.log(`setting word to ${chosenWord} at time ${(new Date()).toLocaleTimeString()}`);
-    
+
     if (!room) {
         socket.emit(ServerEvent.ERROR, {
             message: `Failed to fetch room for diven room id, ${chosenWord} not set for room id ${roomId}`
@@ -568,3 +606,68 @@ const validateGame = socketHandler(
         return room.players && room.players?.length > 1
     }
 )
+
+const endGame = async (roomId, reason, socket, io) => {
+    // reasons: 
+    // players < 2 -> take the one in the room back to lobby, do not end game
+    // a valid end -> truly end the game
+    // server error -> emit to all sockets server error, clean up room, tell them to create a new room and play
+    const room = await getRedisRoom(roomId)
+    if (!room) {
+        socket.emit(ServerEvent.ERROR, {
+            message: 'Failed to fetch room for diven room id, settings not updated'
+        })
+        return
+    }
+
+    if (reason === END_REASON.VALID_END) {
+        io.to(roomId).emit(
+            ServerEvent.GAME_END,
+            {
+                endReason: END_REASON.VALID_END,
+                room
+            }
+        )
+        const scores = await calcFinalScores(room)
+        io.to(roomId).emit(
+            ServerEvent.SCORES,
+            scores
+        )
+
+        setTimeout(async () => {
+            return await deleteRedisRoom(roomId)
+        }, 30000);
+    }
+    else if (reason === END_REASON.NOT_ENOUGH_PARTICIPANTS) {
+        io.to(roomId).emit(
+            ServerEvent.GAME_END,
+            {
+                endReason: END_REASON.NOT_ENOUGH_PARTICIPANTS,  // not a real end, people can still join and resume
+                room
+            }
+        )
+
+    }
+    else if (reason === END_REASON.SERVER_FAILURE) {
+        io.to(roomId).emit(
+            ServerEvent.GAME_END,
+            {
+                endReason: END_REASON.SERVER_FAILURE,  // not a real end, people can still join and resume
+            }
+        )
+        return await deleteRedisRoom(roomId)
+    }
+}
+
+const calcFinalScores = async (room) => {
+    let players = room?.players
+    players.sort((p1, p2) => (p1?.points - p2?.points))
+    const scores = {
+        winners: {
+            first: players[0],
+            second: players[1],
+            third: players.length > 2 ? players[2] : null
+        },
+        players
+    }
+}

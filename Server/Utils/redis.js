@@ -104,6 +104,15 @@ const getRoomFromSocket = async (socketId) => {
     return null
 }
 
+const deleteRedisRoom = async (roomId) => {
+    if (!roomId) {
+        console.log('Missing room id while getting room in deleting')
+        return 
+    }
+    await client.del(`${PUBLIC}${ROOM}${roomId}`)
+    await client.del(`${ROOM}${roomId}`)
+}
+
 
 
 export default client
@@ -115,5 +124,5 @@ export {
     createNewRoom,
     getPublicRoom,
     getRoomFromSocket,
-    
+    deleteRedisRoom
 }
