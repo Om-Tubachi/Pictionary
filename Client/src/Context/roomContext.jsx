@@ -2,7 +2,7 @@
 /* eslint-disable no-unused-vars */
 import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { socket } from '../socket.js'
-import { ServerEvent, ClientEvent, DEFAULT_ROOM } from '../Constants/Constants.js'
+import { ServerEvent, ClientEvent, DEFAULT_ROOM, END_REASON } from '../Constants/Constants.js'
 
 const RoomContext = createContext()
 
@@ -11,16 +11,18 @@ export const RoomProvider = ({ children }) => {
     const [roomId, setRoomId] = useState('')
     const [words, setWords] = useState([])
     const [currPlayer, setCurrPlayer] = useState({})
+    const [scores, setScores] = useState({})
     const [chosen, setChosen] = useState(false)
     const canvasRef = useRef(null)
 
-    let drawingData = []
-    let undoStk = []
+    const drawingData = useRef([])
+    const undoStk = useRef([])
 
 
     useEffect(() => {
         console.log(room)
         console.log(currPlayer?.username);
+
         socket.on(ServerEvent.JOINED, ({ room: receivedRoom, data }) => {
             if (!receivedRoom) return
             setRoomId(receivedRoom.roomId)
@@ -34,25 +36,26 @@ export const RoomProvider = ({ children }) => {
             alert(message)
         })
 
-        socket.on(ServerEvent.LEFT, ({ playerLeft, newHost }) => {
+        socket.on(ServerEvent.LEFT, ({ playerLeft, message }) => {
             setRoom(prev => {
                 const updatedRoom = {
                     ...prev,
                     players: prev.players.filter(p => p.id !== playerLeft.id)
                 }
-                if (newHost) {
-                    updatedRoom.creator = newHost.id
-                    if (newHost.id === socket.id) {
-                        alert(`${playerLeft.username} left. You are now the host!`)
-                    } else {
-                        alert(`${playerLeft.username} left. ${newHost.username} is now the host.`)
-                    }
-                } else {
-                    alert(`${playerLeft.username} left the room`)
-                }
-
                 return updatedRoom
             })
+            alert(message)
+        })
+
+        socket.on(ServerEvent.NEW_HOST, ({ newCreatorId, message }) => {
+            setRoom(prev => {
+                const updatedRoom = {
+                    ...prev,
+                    creator: newCreatorId
+                }
+                return updatedRoom
+            })
+            alert(message)
         })
 
         socket.on(ClientEvent.SETTINGS_UPDATE, ({ room: receivedRoom }) => {
@@ -88,7 +91,7 @@ export const RoomProvider = ({ children }) => {
         socket.on(ServerEvent.UNDO, ({ drawingData }) => {
             console.log('got it from server');
             draw(drawingData)
-            
+
         })
 
         socket.on(ServerEvent.REDO, ({ drawingData }) => draw(drawingData))
@@ -96,7 +99,27 @@ export const RoomProvider = ({ children }) => {
         socket.on(ServerEvent.CLEAR, ({ message }) => {
             const ctx = canvasRef.current?.getContext('2d')
             ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
-            undoStk = []
+            undoStk.current = []
+        })
+
+        socket.on(ServerEvent.GAME_END, ({ endReason, room }) => {
+            // three cases
+
+            if (endReason === END_REASON.VALID_END) {
+                setRoom(room)
+                alert(`The game finished succesfully, showing final scores..`)
+            }
+            else if (endReason === END_REASON.NOT_ENOUGH_PARTICIPANTS) {
+                setRoom(room)
+                alert(`Everyone left the room, atleast 2 people required to resume`)
+            }
+            else if (endReason === END_REASON.SERVER_FAILURE) {
+                alert(`Oh-ohh`)
+            }
+        })
+
+        socket.on(ServerEvent.SCORES, ({ scores }) => {
+            setScores(scores)
         })
 
 
@@ -111,6 +134,13 @@ export const RoomProvider = ({ children }) => {
             socket.off(ServerEvent.CHOSING_WORD)
             socket.off(ServerEvent.GAME_STARTED)
             socket.off(ServerEvent.WORD_CHOSEN)
+            socket.off(ServerEvent.DRAW)
+            socket.off(ServerEvent.UNDO)
+            socket.off(ServerEvent.REDO)
+            socket.off(ServerEvent.CLEAR)
+            socket.off(ServerEvent.GAME_END)
+            socket.off(ServerEvent.SCORES)
+            socket.off(ServerEvent.NEW_HOST) 
         }
     }, [])
 
@@ -156,52 +186,51 @@ export const RoomProvider = ({ children }) => {
     }
 
     const handleDraw = (stroke) => {
-        drawingData.push(stroke)
-        if (drawingData.length === 0) drawingData = []
+        drawingData.current.push(stroke)
+        if (drawingData.current.length === 0) drawingData.current = []
 
         socket.emit(ClientEvent.DRAW, {
-            drawingData,
+            drawingData:drawingData.current,
             roomId,
             currPlayer
         })
     }
 
     const handleUndo = () => {
-        if (drawingData.length === 0) return
+        if (drawingData.current.length === 0) return
 
-        undoStk.push(drawingData.pop())
-        console.log(roomId);
-        
+        undoStk.current.push(drawingData.current.pop())
+
         socket.emit(ClientEvent.UNDO, {
-            drawingData,
+            drawingData:drawingData.current,
             roomId
         })
         // draw(drawingData)
     }
 
     const handleRedo = () => {
-        if (undoStk.length === 0) return
+        if (undoStk.current.length === 0) return
 
-        drawingData.push(undoStk.pop())
+        drawingData.current.push(undoStk.current.pop())
         socket.emit(ClientEvent.REDO, {
-            drawingData,
+            drawingData:drawingData.current,
             roomId
         })
     }
 
     const handleDelete = () => {
-        if (drawingData.length === 0) return
-        drawingData = []
+        if (drawingData.current.length === 0) return
+        drawingData.current = []
         socket.emit(ClientEvent.CLEAR, {
             roomId
         })
     }
 
     const draw = (data) => {
-        
+
         const ctx = canvasRef.current?.getContext('2d')
         ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
-        
+
         for (const stroke of data) {
             ctx.beginPath()
             ctx.strokeStyle = stroke.color
@@ -224,6 +253,7 @@ export const RoomProvider = ({ children }) => {
             currPlayer,
             chosen,
             canvasRef,
+            scores,
             setRoom,
             handlePlayerJoin,
             customRoom,

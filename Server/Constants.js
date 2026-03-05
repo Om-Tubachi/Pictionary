@@ -24,7 +24,8 @@ export const ServerEvent = {
     POINTS_AWARDED: 'points-awarded',
     UPDATE: 'update',
     POINTS_TO_CURR: 'points-to-curr',
-    NEW_HOST:'new-host'
+    NEW_HOST:'new-host',
+    SCORES:'scores'
 }
 
 

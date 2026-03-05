@@ -6,6 +6,8 @@ import Settings from '../Settings/Settings.jsx'
 import ChoseChosing from '../ChoseChosing'
 import Chat from '../Chat'
 import Canvas from '../Canvas'
+import LeaderBoard from './LeaderBoard.jsx'
+import { RoomState } from '../../Constants/Constants.js'
 
 
 function GameRoom() {
@@ -35,15 +37,16 @@ function GameRoom() {
 
       {/* Drawing board */}
       <div id="drawing-board" className='flex-1 bg-white rounded-lg'>
-        <Settings />
+        {roomState === RoomState.LOBBY && < Settings />}
         {roomState === 'lobby' && (<div>
           <button
-          className='px-3 py-2 mx-2 my-1 bg-green-300 hover:cursor-pointer'
+            className='px-3 py-2 mx-2 my-1 bg-green-300 hover:cursor-pointer'
             disabled={socket.id !== room.creator}
             onClick={() => start()}>Start</button>
         </div>)}
-        <ChoseChosing />
-        <Canvas />
+        {roomState === RoomState.GAME_END && <LeaderBoard />}
+
+        {roomState === RoomState.IN_PROGRESS && <><Canvas /> <ChoseChosing /></>}
         {/* Canvas goes here */}
       </div>
 

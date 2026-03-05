@@ -8,16 +8,18 @@ export const ServerEvent = {
     LEFT: 'player-left',
     CHOSE_WORD: 'chose-word',
     CHOSING_WORD: 'chosing-word',
-    DRAW:'draw',
-    INCORRECT_GUESS:'incorrect-guess',
-    CORRECT_GUESS:'cirrect-guess',
-    GAME_END:'game-end',
-    GAME_STARTED:'game-started',
-    WORD_CHOSEN:'word-chosen',
-    UNDO:'undo',
-    REDO:'redo',
-    CLEAR:'clear',
-    POINTS_TO_CURR:'points-to-curr'
+    DRAW: 'draw',
+    INCORRECT_GUESS: 'incorrect-guess',
+    CORRECT_GUESS: 'cirrect-guess',
+    GAME_END: 'game-end',
+    GAME_STARTED: 'game-started',
+    WORD_CHOSEN: 'word-chosen',
+    UNDO: 'undo',
+    REDO: 'redo',
+    CLEAR: 'clear',
+    POINTS_TO_CURR: 'points-to-curr',
+    NEW_HOST: 'new-host',
+    SCORES: 'scores'
 }
 
 
@@ -29,15 +31,20 @@ export const ServerEvent = {
 export const ClientEvent = {
     JOIN_GAME: "join-game",
     GET_ROOM: 'get-room',
-    SETTINGS_UPDATE:'settings-update',
-    START_GAME:'start-game',
-    SEND_MESSAGE:'message',
-    DRAW:'draw',
-    UNDO:'undo',
-    REDO:'redo',
-    CLEAR:'clear'
+    SETTINGS_UPDATE: 'settings-update',
+    START_GAME: 'start-game',
+    SEND_MESSAGE: 'message',
+    DRAW: 'draw',
+    UNDO: 'undo',
+    REDO: 'redo',
+    CLEAR: 'clear'
 }
 
+export const END_REASON = {
+    VALID_END: 'valid-end',
+    SERVER_FAILURE: 'server-failure',
+    NOT_ENOUGH_PARTICIPANTS: 'not-enough-participants'
+}
 
 /**
  * @description DEFAULTS
