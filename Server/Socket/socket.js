@@ -63,8 +63,8 @@ export const setupSocket = socketHandler(
                 return await handleUndo(roomId, drawingData, socket, io)
             })
 
-            socket.on(ClientEvent.REDO, async ({ drgData, roomId }) => {
-                return await handleRedo(roomId, drgData, socket, io)
+            socket.on(ClientEvent.REDO, async ({ drawingData, roomId }) => {
+                return await handleRedo(roomId, drawingData, socket, io)
             })
 
             socket.on(ClientEvent.CLEAR, async ({ roomId }) => {
